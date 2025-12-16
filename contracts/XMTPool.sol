@@ -101,9 +101,11 @@ contract XMTPool is AdminRoleUpgrade, Initializable {
             taxBps = 1500;
         }
 
-        uint256 dailyProfit = n.price.mul(n.apr).div(10000);
-        uint256 totalProfit = dailyProfit.mul(uint256(actualDays));
-        uint256 taxAmount = totalProfit.mul(taxBps).div(10000);
+        // uint256 dailyProfit = n.price.mul(n.apr).div(10000);
+        // uint256 totalProfit = dailyProfit.mul(uint256(actualDays));
+        // uint256 taxAmount = totalProfit.mul(taxBps).div(10000);
+        // 复利税改为按本金计提
+        uint256 taxAmount = n.price.mul(taxBps).div(10000);
         _collectPayment(msg.sender, n.price);
         if (taxAmount > 0) {
             entryPoint.subAmountWithStatus(msg.sender, taxAmount, 9);
@@ -134,7 +136,7 @@ contract XMTPool is AdminRoleUpgrade, Initializable {
                 uint256 usedPoints = availablePoints >= remaining ? remaining : availablePoints;
                 pointsPool.spendPoints(user, usedPoints);
                 remaining -= usedPoints;
-            }
+            } 
         }
         if (remaining > 0) {
             entryPoint.subAmountWithStatus(user, remaining, 1);
@@ -160,6 +162,19 @@ contract XMTPool is AdminRoleUpgrade, Initializable {
         NodeInfo storage n = _nodes[nodeId];
         require(n.nodeId != 0, "node not found");
         return (n.day, n.apr, n.price);
+    }
+
+    function getUserCompoundingTax(address user, uint256 machineId, uint256 nodeId) external view returns (uint256 taxAmount, uint256 taxBps) {
+        NodeInfo storage n = _nodes[nodeId];
+        require(n.nodeId != 0, "node not found");
+        uint16 dayKey = n.day;
+        uint256 priorCount = userCyclePurchaseCount[user][machineId][dayKey];
+        taxBps = priorCount * 500;
+        if (taxBps > 1500) {
+            taxBps = 1500;
+        }
+        taxAmount = n.price.mul(taxBps).div(10000);
+        return (taxAmount, taxBps);
     }
 
     function getLastPurchaseInfo(address user, uint256 machineId) external view returns (uint256 lastNodeId, uint16 day, uint16 apr, uint256 price) {
